@@ -122,6 +122,14 @@ namespace Squidex.Domain.Apps.Entities.Contents
                         ChangeStatus(c);
                     });
 
+                case CreateNewVersion createNewVersion:
+                    return UpdateAsync(createNewVersion, async c =>
+                    {
+                        var operationContext = await CreateContext(c, () => "Failed to create new version.");
+
+                        await operationContext.ExecuteScriptAsync(x => x.ScriptChange, "Draft");
+                        CreateNewVersion(c);
+                    });
                 case DeleteContent deleteContent:
                     return UpdateAsync(deleteContent, async c =>
                     {
@@ -167,6 +175,11 @@ namespace Squidex.Domain.Apps.Entities.Contents
             {
                 RaiseEvent(SimpleMapper.Map(command, new ContentStatusChanged()));
             }
+        }
+
+        public void CreateNewVersion(CreateNewVersion command)
+        {
+                RaiseEvent(SimpleMapper.Map(command, new ContentNewVersionCreated()));
         }
 
         public void Patch(PatchContent command)

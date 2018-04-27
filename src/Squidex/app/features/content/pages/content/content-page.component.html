@@ -1,26 +1,33 @@
 <sqx-title message="{app} | {schema} | Content" parameter1="app" parameter2="schema" [value1]="ctx.appName" [value2]="schema?.displayName"></sqx-title>
 
-<form [formGroup]="contentForm" (ngSubmit)="saveAndPublish()">
+<form [formGroup]="contentForm" (ngSubmit)="saveAsDraft()">
     <sqx-panel desiredWidth="53rem">
         <div class="panel-header">
             <div class="panel-title-row">
                 <div class="float-right" *ngIf="!content || content.status !== 'Archived'">
                     <span *ngIf="isNewMode">
-                        <button type="button" class="btn btn-secondary" (click)="saveAsDraft()" title="CTRL + S">
+                        <button type="submit" class="btn btn-secondary"  title="CTRL + S">
                             Save as Draft
                         </button>
 
-                        <button type="submit" class="btn btn-primary">
+                        <button type="button" class="btn btn-primary" (click)="saveAndPublish()">
                             Save and Publish
                         </button>
                     </span>
-                    <span *ngIf="!isNewMode">
-                        <button type="submit" class="btn btn-primary" title="CTRL + S">
-                            Save
+                    <span *ngIf="!isNewMode && !isPublished">
+                        <button type="submit" class="btn btn-secondary" title="CTRL + S">
+                            Save as Draft
+                        </button>
+                        <button type="button" class="btn btn-primary" (click)="publish()">
+                            Publish
                         </button>
                     </span>
-                    
-                    <sqx-shortcut keys="ctrl+s" (trigger)="saveAndPublish()"></sqx-shortcut>
+                    <span *ngIf="isPublished">
+                        <button type="button" class="btn btn-secondary"  (click)="createNewVersion()">
+                            Create New Version
+                        </button>                       
+                    </span>
+                    <sqx-shortcut keys="ctrl+s" (trigger)="saveAsDraft()"></sqx-shortcut>
                 </div>
                 
                 <h3 class="panel-title" *ngIf="isNewMode">

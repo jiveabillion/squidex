@@ -27,10 +27,15 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
     {
         private readonly IAppProvider appProvider;
         private readonly IMongoCollection<MongoContentEntity> archiveCollection;
-
+        private readonly IMongoCollection<MongoContentEntity> latestCollection;
         protected IMongoCollection<MongoContentEntity> ArchiveCollection
         {
             get { return archiveCollection; }
+        }
+
+        protected IMongoCollection<MongoContentEntity> LatestCollection
+        {
+            get { return latestCollection; }
         }
 
         public MongoContentRepository(IMongoDatabase database, IAppProvider appProvider)
@@ -41,6 +46,7 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             this.appProvider = appProvider;
 
             archiveCollection = database.GetCollection<MongoContentEntity>("States_Contents_Archive");
+            latestCollection = database.GetCollection<MongoContentEntity>("States_Contents_Latest");
         }
 
         protected override string CollectionName()
@@ -61,6 +67,22 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
                     .Ascending(x => x.Id)
                     .Ascending(x => x.Version));
 
+            await latestCollection.Indexes.CreateOneAsync(
+                Index
+                    .Text(x => x.DataText)
+                    .Ascending(x => x.SchemaIdId)
+                    .Ascending(x => x.Status)
+                    .Ascending(x => x.IsDeleted));
+
+            await latestCollection.Indexes.CreateOneAsync(
+                Index
+                    .Ascending(x => x.SchemaIdId)
+                    .Ascending(x => x.Id)
+                    .Ascending(x => x.IsDeleted)
+                    .Ascending(x => x.Status));
+
+            await latestCollection.Indexes.CreateOneAsync(Index.Ascending(x => x.ReferencedIds));
+
             await collection.Indexes.CreateOneAsync(
                 Index
                     .Text(x => x.DataText)
@@ -78,17 +100,28 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             await collection.Indexes.CreateOneAsync(Index.Ascending(x => x.ReferencedIds));
         }
 
-        public async Task<IResultList<IContentEntity>> QueryAsync(IAppEntity app, ISchemaEntity schema, Status[] status, ODataUriParser odataQuery)
+        public async Task<IResultList<IContentEntity>> QueryAsync(IAppEntity app, ISchemaEntity schema, Status[] status, ODataUriParser odataQuery, bool latest = false)
         {
             try
             {
+                IMongoCollection<MongoContentEntity> sourceCollection;
+
+                if (latest)
+                {
+                    sourceCollection = LatestCollection;
+                }
+                else
+                {
+                    sourceCollection = Collection;
+                }
+
                 var propertyCalculator = FindExtensions.CreatePropertyCalculator(schema.SchemaDef);
 
                 var filter = FindExtensions.BuildQuery(odataQuery, schema.Id, status, propertyCalculator);
 
-                var contentCount = Collection.Find(filter).CountAsync();
+                var contentCount = sourceCollection.Find(filter).CountAsync();
                 var contentItems =
-                    Collection.Find(filter)
+                    sourceCollection.Find(filter)
                         .ContentTake(odataQuery)
                         .ContentSkip(odataQuery)
                         .ContentSort(odataQuery, propertyCalculator)
@@ -124,9 +157,20 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             }
         }
 
-        public async Task<IResultList<IContentEntity>> QueryAsync(IAppEntity app, ISchemaEntity schema, Status[] status, HashSet<Guid> ids)
+        public async Task<IResultList<IContentEntity>> QueryAsync(IAppEntity app, ISchemaEntity schema, Status[] status, HashSet<Guid> ids, bool latest = false)
         {
-            var find = Collection.Find(x => x.SchemaIdId == schema.Id && ids.Contains(x.Id) && x.IsDeleted == false && status.Contains(x.Status));
+            IMongoCollection<MongoContentEntity> sourceCollection;
+
+            if (latest)
+            {
+                sourceCollection = LatestCollection;
+            }
+            else
+            {
+                sourceCollection = Collection;
+            }
+
+            var find = sourceCollection.Find(x => x.SchemaIdId == schema.Id && ids.Contains(x.Id) && x.IsDeleted == false && status.Contains(x.Status));
 
             var contentItems = find.ToListAsync();
             var contentCount = find.CountAsync();
@@ -141,10 +185,21 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             return ResultList.Create<IContentEntity>(contentItems.Result, contentCount.Result);
         }
 
-        public async Task<IReadOnlyList<Guid>> QueryNotFoundAsync(Guid appId, Guid schemaId, IList<Guid> ids)
+        public async Task<IReadOnlyList<Guid>> QueryNotFoundAsync(Guid appId, Guid schemaId, IList<Guid> ids, bool latest = false)
         {
+            IMongoCollection<MongoContentEntity> sourceCollection;
+
+            if (latest)
+            {
+                sourceCollection = LatestCollection;
+            }
+            else
+            {
+                sourceCollection = Collection;
+            }
+
             var contentEntities =
-                await Collection.Find(x => x.SchemaIdId == schemaId && ids.Contains(x.Id) && x.IsDeleted == false).Only(x => x.Id)
+                await sourceCollection.Find(x => x.SchemaIdId == schemaId && ids.Contains(x.Id) && x.IsDeleted == false).Only(x => x.Id)
                     .ToListAsync();
 
             return ids.Except(contentEntities.Select(x => Guid.Parse(x["id"].AsString))).ToList();
@@ -161,10 +216,21 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             return contentEntity;
         }
 
-        public async Task<IContentEntity> FindContentAsync(IAppEntity app, ISchemaEntity schema, Guid id)
+        public async Task<IContentEntity> FindContentAsync(IAppEntity app, ISchemaEntity schema, Guid id, bool latest = false)
         {
+            IMongoCollection<MongoContentEntity> sourceCollection;
+
+            if (latest)
+            {
+                sourceCollection = LatestCollection;
+            }
+            else
+            {
+                sourceCollection = Collection;
+            }
+
             var contentEntity =
-                await Collection.Find(x => x.SchemaIdId == schema.Id && x.Id == id && x.IsDeleted == false)
+                await sourceCollection.Find(x => x.SchemaIdId == schema.Id && x.Id == id && x.IsDeleted == false)
                     .FirstOrDefaultAsync();
 
             contentEntity?.ParseData(schema.SchemaDef);
@@ -172,9 +238,20 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
             return contentEntity;
         }
 
-        public Task QueryScheduledWithoutDataAsync(Instant now, Func<IContentEntity, Task> callback)
+        public Task QueryScheduledWithoutDataAsync(Instant now, Func<IContentEntity, Task> callback, bool latest = false)
         {
-            return Collection.Find(x => x.ScheduledAt < now && x.IsDeleted == false)
+            IMongoCollection<MongoContentEntity> sourceCollection;
+
+            if (latest)
+            {
+                sourceCollection = LatestCollection;
+            }
+            else
+            {
+                sourceCollection = Collection;
+            }
+
+            return sourceCollection.Find(x => x.ScheduledAt < now && x.IsDeleted == false)
                 .ForEachAsync(c =>
                 {
                     callback(c);

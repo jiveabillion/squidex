@@ -74,6 +74,15 @@ namespace Squidex.Domain.Apps.Entities.Contents.State
             ScheduledTo = null;
         }
 
+        protected void On(ContentNewVersionCreated @event)
+        {
+            Status = Status.Draft;
+
+            ScheduledAt = null;
+            ScheduledBy = null;
+            ScheduledTo = null;
+        }
+
         protected void On(ContentDeleted @event)
         {
             IsDeleted = true;

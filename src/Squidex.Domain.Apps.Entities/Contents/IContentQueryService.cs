@@ -17,11 +17,11 @@ namespace Squidex.Domain.Apps.Entities.Contents
 {
     public interface IContentQueryService
     {
-        Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, HashSet<Guid> ids);
+        Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, HashSet<Guid> ids, bool latest = false);
 
-        Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, string query);
+        Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, string query, bool latest = false);
 
-        Task<(ISchemaEntity Schema, IContentEntity Content)> FindContentAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, Guid id, long version = EtagVersion.Any);
+        Task<(ISchemaEntity Schema, IContentEntity Content)> FindContentAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, Guid id, long version = EtagVersion.Any, bool latest = false);
 
         Task<ISchemaEntity> FindSchemaAsync(IAppEntity app, string schemaIdOrName);
     }

@@ -280,7 +280,7 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
 
             var contents = new List<IContentEntity> { content };
 
-            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, "?$top=30&$skip=5"))
+            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, "?$top=30&$skip=5", false))
                 .Returns((schema, ResultList.Create(contents, 0)));
 
             var result = await sut.QueryAsync(app, user, new GraphQLQuery { Query = query });
@@ -396,7 +396,7 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
 
             var contents = new List<IContentEntity> { content };
 
-            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, "?$top=30&$skip=5"))
+            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, "?$top=30&$skip=5", false))
                 .Returns((schema, ResultList.Create(contents, 10)));
 
             var result = await sut.QueryAsync(app, user, new GraphQLQuery { Query = query });
@@ -512,7 +512,7 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
                   }}
                 }}";
 
-            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any))
+            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any, false))
                 .Returns((schema, content));
 
             var result = await sut.QueryAsync(app, user, new GraphQLQuery { Query = query });
@@ -604,10 +604,10 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
 
             var refContents = new List<IContentEntity> { contentRef };
 
-            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any))
+            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any, false))
                 .Returns((schema, content));
 
-            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, A<HashSet<Guid>>.That.Matches(x => x.Contains(contentRefId))))
+            A.CallTo(() => contentQuery.QueryAsync(app, schema.Id.ToString(), user, false, A<HashSet<Guid>>.That.Matches(x => x.Contains(contentRefId)), false))
                 .Returns((schema, ResultList.Create(refContents, 0)));
 
             var result = await sut.QueryAsync(app, user, new GraphQLQuery { Query = query });
@@ -664,7 +664,7 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
 
             var refAssets = new List<IAssetEntity> { assetRef };
 
-            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any))
+            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any, false))
                 .Returns((schema, content));
 
             A.CallTo(() => assetRepository.QueryAsync(app.Id, A<HashSet<Guid>>.That.Matches(x => x.Contains(assetRefId))))
@@ -723,7 +723,7 @@ namespace Squidex.Domain.Apps.Entities.Contents.GraphQL
                   }}
                 }}";
 
-            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any))
+            A.CallTo(() => contentQuery.FindContentAsync(app, schema.Id.ToString(), user, contentId, EtagVersion.Any, false))
                 .Returns((schema, content));
 
             var result = await sut.QueryAsync(app, user, new GraphQLQuery { Query = query });

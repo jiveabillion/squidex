@@ -93,7 +93,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
         {
             A.CallTo(() => appProvider.GetSchemaAsync(appId, schemaId, false))
                 .Returns(schema);
-            A.CallTo(() => contentRepository.FindContentAsync(app, schema, contentId))
+            A.CallTo(() => contentRepository.FindContentAsync(app, schema, contentId, false))
                 .Returns(content);
 
             A.CallTo(() => schema.ScriptQuery)
@@ -116,7 +116,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             A.CallTo(() => appProvider.GetSchemaAsync(appId, schemaId, false))
                 .Returns(schema);
 
-            A.CallTo(() => contentRepository.FindContentAsync(app, schema, contentId))
+            A.CallTo(() => contentRepository.FindContentAsync(app, schema, contentId, false))
                 .Returns((IContentEntity)null);
 
             await Assert.ThrowsAsync<DomainObjectNotFoundException>(async () => await sut.FindContentAsync(app, schemaId.ToString(), user, contentId));
@@ -199,7 +199,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             A.CallTo(() => appProvider.GetSchemaAsync(appId, schemaId, false))
                 .Returns(schema);
 
-            A.CallTo(() => contentRepository.QueryAsync(app, schema, A<Status[]>.That.IsSameSequenceAs(status), ids))
+            A.CallTo(() => contentRepository.QueryAsync(app, schema, A<Status[]>.That.IsSameSequenceAs(status), ids, false))
                 .Returns(ResultList.Create(Enumerable.Repeat(content, 1), 123));
         }
 
@@ -208,7 +208,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             A.CallTo(() => appProvider.GetSchemaAsync(appId, schemaId, false))
                 .Returns(schema);
 
-            A.CallTo(() => contentRepository.QueryAsync(app, schema, A<Status[]>.That.IsSameSequenceAs(status), A<ODataUriParser>.Ignored))
+            A.CallTo(() => contentRepository.QueryAsync(app, schema, A<Status[]>.That.IsSameSequenceAs(status), A<ODataUriParser>.Ignored, false))
                 .Returns(ResultList.Create(Enumerable.Repeat(content, 1), 123));
         }
 

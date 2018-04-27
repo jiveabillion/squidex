@@ -48,7 +48,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             this.modelBuilder = modelBuilder;
         }
 
-        public async Task<(ISchemaEntity Schema, IContentEntity Content)> FindContentAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, Guid id, long version = -1)
+        public async Task<(ISchemaEntity Schema, IContentEntity Content)> FindContentAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, Guid id, long version = -1, bool latest = false)
         {
             Guard.NotNull(app, nameof(app));
             Guard.NotNull(user, nameof(user));
@@ -61,7 +61,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             var content =
                 version > EtagVersion.Empty ?
                 await contentRepository.FindContentAsync(app, schema, id, version) :
-                await contentRepository.FindContentAsync(app, schema, id);
+                await contentRepository.FindContentAsync(app, schema, id, latest);
 
             if (content == null || (content.Status != Status.Published && !isFrontendClient))
             {
@@ -73,7 +73,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
             return (schema, content);
         }
 
-        public async Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, string query)
+        public async Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, string query, bool latest = false)
         {
             Guard.NotNull(app, nameof(app));
             Guard.NotNull(user, nameof(user));
@@ -84,12 +84,12 @@ namespace Squidex.Domain.Apps.Entities.Contents
             var parsedQuery = ParseQuery(app, query, schema);
             var parsedStatus = ParseStatus(user, archived);
 
-            var contents = await contentRepository.QueryAsync(app, schema, parsedStatus.ToArray(), parsedQuery);
+            var contents = await contentRepository.QueryAsync(app, schema, parsedStatus.ToArray(), parsedQuery, latest);
 
             return TransformContents(user, schema, contents);
         }
 
-        public async Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, HashSet<Guid> ids)
+        public async Task<(ISchemaEntity Schema, IResultList<IContentEntity> Contents)> QueryAsync(IAppEntity app, string schemaIdOrName, ClaimsPrincipal user, bool archived, HashSet<Guid> ids, bool latest = false)
         {
             Guard.NotNull(ids, nameof(ids));
             Guard.NotNull(app, nameof(app));
@@ -100,7 +100,7 @@ namespace Squidex.Domain.Apps.Entities.Contents
 
             var parsedStatus = ParseStatus(user, archived);
 
-            var contents = await contentRepository.QueryAsync(app, schema, parsedStatus.ToArray(), ids);
+            var contents = await contentRepository.QueryAsync(app, schema, parsedStatus.ToArray(), ids, latest);
 
             return TransformContents(user, schema, contents);
         }

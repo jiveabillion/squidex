@@ -23,7 +23,7 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
         public async Task<(ContentState Value, long Version)> ReadAsync(Guid key)
         {
             var contentEntity =
-                await Collection.Find(x => x.Id == key).SortByDescending(x => x.Version)
+                await LatestCollection.Find(x => x.Id == key).SortByDescending(x => x.Version)
                     .FirstOrDefaultAsync();
 
             if (contentEntity != null)
@@ -61,31 +61,34 @@ namespace Squidex.Domain.Apps.Entities.MongoDb.Contents
                 DataByIds = idData,
                 ReferencedIds = idData?.ToReferencedIds(schema.SchemaDef),
             });
-
             document.Version = newVersion;
-
-            try
+            if (document.Status == Core.Contents.Status.Published)
             {
-                await Collection.ReplaceOneAsync(x => x.DocumentId == id && x.Version == oldVersion, document, Upsert);
-            }
-            catch (MongoWriteException ex)
-            {
-                if (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+                try
                 {
-                    var existingVersion =
-                        await Collection.Find(x => x.DocumentId == id).Only(x => x.DocumentId, x => x.Version)
-                            .FirstOrDefaultAsync();
-
-                    if (existingVersion != null)
+                    await Collection.ReplaceOneAsync(x => x.DocumentId == id, document, Upsert);
+                }
+                catch (MongoWriteException ex)
+                {
+                    if (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
                     {
-                        throw new InconsistentStateException(existingVersion["vs"].AsInt64, oldVersion, ex);
+                        var existingVersion =
+                            await Collection.Find(x => x.DocumentId == id).Only(x => x.DocumentId, x => x.Version)
+                                .FirstOrDefaultAsync();
+
+                        if (existingVersion != null)
+                        {
+                            throw new InconsistentStateException(existingVersion["vs"].AsInt64, oldVersion, ex);
+                        }
+                    }
+                    else
+                    {
+                        throw;
                     }
                 }
-                else
-                {
-                    throw;
-                }
             }
+
+            await LatestCollection.ReplaceOneAsync(x => x.DocumentId == document.DocumentId, document, Upsert);
 
             document.DocumentId = $"{key}_{newVersion}";
 

@@ -52,6 +52,7 @@ export class ContentPageComponent implements CanComponentDeactivate, OnDestroy, 
     public contentForm: FormGroup;
 
     public isNewMode = true;
+    public isPublished = false;
 
     public languages: AppLanguageDto[] = [];
 
@@ -142,15 +143,57 @@ export class ContentPageComponent implements CanComponentDeactivate, OnDestroy, 
         this.saveContent(false);
     }
 
-    private saveContent(publish: boolean) {
+    public createNewVersion() {
+        this.saveContent(false, true);
+    }
+
+    public publish() {
+        if (!this.contentForm.dirty) {
+            this.contentsService.changeContentStatus(this.ctx.appName, this.schema.name, this.content.id, 'publish', null, this.content.version)
+            .subscribe(dto => {
+                this.contentsService.getContent(this.ctx.appName, this.schema.name, this.content.id, true).subscribe(dto2 => {
+                    this.ctx.notifyInfo('Published successfully.');
+                    this.content = dto2;
+                    this.emitContentUpdated(this.content);
+                    this.disableContentForm();
+                    this.reloadContentForm(this.content);
+                });
+            }, error => {
+                this.ctx.notifyError(error);
+
+                this.enableContentForm();
+            });
+        } else {
+            this.ctx.notifyError('Please save changes before publishing.');
+        }
+    }
+
+    private saveContent(publish: boolean, newVersion?: boolean) {
         this.contentFormSubmitted = true;
+        if (newVersion) {
+             this.enableContentForm();
+        }
 
         if (this.contentForm.valid) {
             this.disableContentForm();
 
             const requestDto = this.contentForm.value;
+            if (newVersion) {
+                this.contentsService.newVersion(this.ctx.appName, this.schema.name, this.content.id, requestDto, this.content.version)
+                .subscribe(dto => {
+                    this.contentsService.getContent(this.ctx.appName, this.schema.name, this.content.id, true).subscribe(dto2 => {
+                        this.ctx.notifyInfo('New Version created successfully.');
+                        this.content = dto2;
+                        this.emitContentUpdated(this.content);
+                        this.enableContentForm();
+                        this.reloadContentForm(this.content);
+                    });
+                }, error => {
+                    this.ctx.notifyError(error);
 
-            if (this.isNewMode) {
+                    this.enableContentForm();
+                });
+            } else if (this.isNewMode) {
                 this.contentsService.postContent(this.ctx.appName, this.schema.name, requestDto, publish)
                     .subscribe(dto => {
                         this.content = dto;
@@ -269,9 +312,21 @@ export class ContentPageComponent implements CanComponentDeactivate, OnDestroy, 
     private reloadContentForm(content: ContentDto) {
         this.content = content;
         this.contentForm.markAsPristine();
-
+        this.contentForm.enable();
         this.isNewMode = !this.content;
-
+        if (!this.isNewMode) {
+            if (this.content.status === 'Archived' || this.content.status === 'Published') {
+                if (!this.isPublished) {
+                    this.isPublished = true;
+                    this.reloadContentForm(content);
+                }
+            } else {
+                if (this.isPublished) {
+                    this.isPublished = false;
+                    this.reloadContentForm(content);
+                }
+            }
+        }
         if (!this.isNewMode) {
             for (const field of this.schema.fields) {
                 const fieldValue = this.content.data[field.name] || {};
@@ -285,10 +340,12 @@ export class ContentPageComponent implements CanComponentDeactivate, OnDestroy, 
                     fieldForm.controls[fieldInvariant].setValue(fieldValue[fieldInvariant] === undefined ? null : fieldValue[fieldInvariant]);
                 }
             }
-            if (this.content.status === 'Archived') {
+            if (this.content.status === 'Archived' || this.content.status === 'Published') {
                 this.contentForm.disable();
+                this.isPublished = true;
             }
         } else {
+            this.isPublished = false;
             for (const field of this.schema.fields) {
                 const defaultValue = field.defaultValue();
 

@@ -85,10 +85,10 @@ export class ContentDto {
         }
     }
 
-    public update(data: any, user: string, version: Version, now?: DateTime): ContentDto {
+    public update(data: any, user: string, version: Version, now?: DateTime, status?: string): ContentDto {
         return new ContentDto(
             this.id,
-            this.status,
+            status || this.status,
             this.createdBy, user,
             this.created, now || DateTime.now(),
             this.scheduledTo,
@@ -108,7 +108,7 @@ export class ContentsService {
     ) {
     }
 
-    public getContents(appName: string, schemaName: string, take: number, skip: number, query?: string, ids?: string[], archived = false): Observable<ContentsDto> {
+    public getContents(appName: string, schemaName: string, take: number, skip: number, query?: string, ids?: string[], archived = false, latest = false): Observable<ContentsDto> {
         const queryParts: string[] = [];
 
         if (query && query.length > 0) {
@@ -135,6 +135,10 @@ export class ContentsService {
 
         if (archived) {
             queryParts.push('archived=true');
+        }
+
+        if (latest) {
+            queryParts.push('latest=true');
         }
 
         const fullQuery = queryParts.join('&');
@@ -165,8 +169,12 @@ export class ContentsService {
                 .pretifyError('Failed to load contents. Please reload.');
     }
 
-    public getContent(appName: string, schemaName: string, id: string): Observable<ContentDto> {
-        const url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}`);
+    public getContent(appName: string, schemaName: string, id: string, latest?: boolean ): Observable<ContentDto> {
+        let url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}`);
+
+        if (latest) {
+            url = url + '?latest=true';
+        }
 
         return HTTP.getVersioned<any>(this.http, url)
                 .map(response => {
@@ -224,9 +232,11 @@ export class ContentsService {
                 .pretifyError('Failed to create content. Please reload.');
     }
 
-    public putContent(appName: string, schemaName: string, id: string, dto: any, version: Version): Observable<Versioned<any>> {
-        const url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}`);
-
+    public putContent(appName: string, schemaName: string, id: string, dto: any, version: Version, newVersion?: boolean): Observable<Versioned<any>> {
+        let url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}`);
+        if (newVersion) {
+            url = url + '?newversion=true';
+        }
         return HTTP.putVersioned(this.http, url, dto, version)
                 .map(response => {
                     const body = response.payload.body;
@@ -239,6 +249,20 @@ export class ContentsService {
                 .pretifyError('Failed to update content. Please reload.');
     }
 
+    public newVersion(appName: string, schemaName: string, id: string, dto: any, version: Version): Observable<Versioned<any>> {
+        let url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}/new/version/`);
+
+        return HTTP.putVersioned(this.http, url, dto, version)
+                .map(response => {
+                    const body = response.payload.body;
+
+                    return new Versioned(response.version, body);
+                })
+                .do(() => {
+                    this.analytics.trackEvent('Content', 'Updated', appName);
+                })
+                .pretifyError('Failed to update content. Please reload.');
+    }
     public patchContent(appName: string, schemaName: string, id: string, dto: any, version: Version): Observable<Versioned<any>> {
         const url = this.apiUrl.buildUrl(`/api/content/${appName}/${schemaName}/${id}`);
 
@@ -273,7 +297,7 @@ export class ContentsService {
 
         return HTTP.putVersioned(this.http, url, {}, version)
                 .do(() => {
-                    this.analytics.trackEvent('Content', 'Archived', appName);
+                    this.analytics.trackEvent('Content', action, appName);
                 })
                 .pretifyError(`Failed to ${action} content. Please reload.`);
     }

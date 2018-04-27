@@ -82,6 +82,7 @@ namespace Squidex.Areas.Api.Controllers.Contents
         /// <param name="name">The name of the schema.</param>
         /// <param name="ids">The optional ids of the content to fetch.</param>
         /// <param name="archived">Indicates whether to query content items from the archive.</param>
+        /// <param name="latest">Indicates whether to query content items from the latest collection.</param>
         /// <returns>
         /// 200 => Contents retrieved.
         /// 404 => Schema or app not found.
@@ -93,7 +94,7 @@ namespace Squidex.Areas.Api.Controllers.Contents
         [HttpGet]
         [Route("content/{app}/{name}/")]
         [ApiCosts(2)]
-        public async Task<IActionResult> GetContents(string app, string name, [FromQuery] bool archived = false, [FromQuery] string ids = null)
+        public async Task<IActionResult> GetContents(string app, string name, [FromQuery] bool archived = false, [FromQuery] string ids = null, [FromQuery] bool latest = false)
         {
             HashSet<Guid> idsList = null;
 
@@ -114,8 +115,8 @@ namespace Squidex.Areas.Api.Controllers.Contents
 
             var result =
                 idsList?.Count > 0 ?
-                    await contentQuery.QueryAsync(App, name, User, archived, idsList) :
-                    await contentQuery.QueryAsync(App, name, User, archived, Request.QueryString.ToString());
+                    await contentQuery.QueryAsync(App, name, User, archived, idsList, latest) :
+                    await contentQuery.QueryAsync(App, name, User, archived, Request.QueryString.ToString(), latest);
 
             var response = new ContentsDto
             {
@@ -144,6 +145,7 @@ namespace Squidex.Areas.Api.Controllers.Contents
         /// <param name="app">The name of the app.</param>
         /// <param name="name">The name of the schema.</param>
         /// <param name="id">The id of the content to fetch.</param>
+        /// <param name="latest">Indicates whether to query content items from the latest collection.</param>
         /// <returns>
         /// 200 => Content found.
         /// 404 => Content, schema or app not found.
@@ -155,9 +157,9 @@ namespace Squidex.Areas.Api.Controllers.Contents
         [HttpGet]
         [Route("content/{app}/{name}/{id}/")]
         [ApiCosts(1)]
-        public async Task<IActionResult> GetContent(string app, string name, Guid id)
+        public async Task<IActionResult> GetContent(string app, string name, Guid id, [FromQuery] bool latest = false)
         {
-            var (schema, entity) = await contentQuery.FindContentAsync(App, name, User, id);
+            var (schema, entity) = await contentQuery.FindContentAsync(App, name, User, id, latest: latest);
 
             var response = SimpleMapper.Map(entity, new ContentDto());
 
@@ -428,6 +430,49 @@ namespace Squidex.Areas.Api.Controllers.Contents
             await CommandBus.PublishAsync(command);
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// Create new version a content item.
+        /// </summary>
+        /// <param name="app">The name of the app.</param>
+        /// <param name="name">The name of the schema.</param>
+        /// <param name="id">The id of the content item to create a new version of.</param>
+        /// <returns>
+        /// 204 => New version create.
+        /// 404 => Content, schema or app not found.
+        /// 400 => Content was not found.
+        /// </returns>
+        /// <remarks>
+        /// You can read the generated documentation for your app at /api/content/{appName}/docs
+        /// </remarks>
+        [MustBeAppEditor]
+        [HttpPut]
+        [Route("content/{app}/{name}/{id}/new/version/")]
+        [ApiCosts(1)]
+        public async Task<IActionResult> CreateNewVersion(string app, string name, Guid id)
+        {
+            await contentQuery.FindSchemaAsync(App, name);
+
+            var command = new CreateNewVersion() { ContentId = id };
+
+            await CommandBus.PublishAsync(command);
+
+            var (schema, entity) = await contentQuery.FindContentAsync(App, name, User, id, latest: true);
+
+            var response = SimpleMapper.Map(entity, new ContentDto());
+
+            if (entity.Data != null)
+            {
+                var isFrontendClient = User.IsFrontendClient();
+
+                response.Data = entity.Data.ToApiModel(schema.SchemaDef, App.LanguagesConfig, !isFrontendClient);
+            }
+
+            Response.Headers["ETag"] = entity.Version.ToString();
+            Response.Headers["Surrogate-Key"] = entity.Id.ToString();
+
+            return Ok(response);
         }
 
         /// <summary>

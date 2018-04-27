@@ -103,6 +103,17 @@ namespace Squidex.Domain.Apps.Core.HandleRules.Actions
                             break;
                         }
 
+                    case ContentNewVersionCreated newVersionCreated:
+                        {
+                            ruleDescription = $"Update entry in ES index: {action.IndexName}";
+
+                            ruleData["Operation"] = "Update";
+                            ruleData["Content"] = new JObject(
+                                new JProperty("lastModified", timestamp),
+                                new JProperty("lastModifiedBy", newVersionCreated.Actor.ToString()));
+                            break;
+                        }
+
                     case ContentDeleted deleted:
                         {
                             ruleDescription = $"Delete entry from ES index: {action.IndexName}";

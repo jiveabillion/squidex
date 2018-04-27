@@ -94,7 +94,7 @@ export class ContentsPageComponent implements OnDestroy, OnInit {
         this.contentUpdatedSubscription =
             this.ctx.bus.of(ContentUpdated)
                 .subscribe(message => {
-                    this.contentItems = this.contentItems.replaceBy('id', message.content, (o, n) => o.update(n.data, n.lastModifiedBy, n.version, n.lastModified));
+                    this.contentItems = this.contentItems.replaceBy('id', message.content, (o, n) => o.update(n.data, n.lastModifiedBy, n.version, n.lastModified, n.status));
                 });
 
         const routeData = allData(this.ctx.route);
@@ -252,7 +252,7 @@ export class ContentsPageComponent implements OnDestroy, OnInit {
     }
 
     public load(showInfo = false) {
-        this.contentsService.getContents(this.ctx.appName, this.schema.name, this.contentsPager.pageSize, this.contentsPager.skip, this.contentsQuery, undefined, this.isArchive)
+        this.contentsService.getContents(this.ctx.appName, this.schema.name, this.contentsPager.pageSize, this.contentsPager.skip, this.contentsQuery, undefined, this.isArchive, true)
             .finally(() => {
                 this.selectedItems = {};
 
